@@ -79,7 +79,6 @@ final class CsrfFilter implements Ordered {
 
     @RequestFilter
     @Nullable
-
     public CompletableFuture<@Nullable HttpResponse<?>> csrfFilter(@NonNull HttpRequest<?> request) {
         if (!shouldTheFilterProcessTheRequestAccordingToTheUriMatch(request)) {
             return PROCEED;
