@@ -45,6 +45,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.micronaut.security.filters.SecurityFilter.TOKEN;
+
 /**
  * An {@link HttpClientFilter} to add an access token to outgoing request thanks to a  Client Credentials request.
  *
@@ -102,6 +104,8 @@ public class ClientCredentialsHttpClientFilter implements HttpClientFilter {
             }
             return chain.proceed(request);
         }
+
+
         ClientCredentialsTokenPropagator tokenHandler = getTokenHandler(oauthClient);
 
         return Flux.from(clientCredentialsClientOptional.get()
@@ -158,6 +162,10 @@ public class ClientCredentialsHttpClientFilter implements HttpClientFilter {
     protected Optional<OauthClientConfiguration> getClientConfiguration(HttpRequest<?> request) {
         return oauthClientConfigurationCollection.stream()
                 .filter(occ -> occ.getClientCredentials().isPresent())
+                .filter(occ -> {
+                    Optional<String> tokenOptional = request.getAttribute(TOKEN, String.class);
+                    return tokenOptional.isEmpty() || occ.getClientCredentials().get().shouldOverwriteExistingToken();
+                })
                 .filter(occ -> outgoingHttpRequestProcessor.shouldProcessRequest(occ.getClientCredentials().get(), request))
                 .findFirst();
     }

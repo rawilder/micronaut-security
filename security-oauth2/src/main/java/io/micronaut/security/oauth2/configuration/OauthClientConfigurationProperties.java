@@ -272,6 +272,8 @@ public class OauthClientConfigurationProperties implements OauthClientConfigurat
 
         private Map<String, String> additonalRequestParams = Collections.emptyMap();
 
+        private Boolean overwriteExistingToken = true;
+
         @NonNull
         @Override
         public Duration getAdvancedExpiration() {
@@ -336,6 +338,19 @@ public class OauthClientConfigurationProperties implements OauthClientConfigurat
         @NonNull
         public Map<String, String> getAdditionalRequestParams() {
             return additonalRequestParams;
+        }
+
+        @Override
+        public Boolean shouldOverwriteExistingToken() {
+            return overwriteExistingToken;
+        }
+
+        /**
+         * Overwrite existing token in the header. Defaults to true.
+         * @param overwriteExistingToken Overwrite existing token in the header
+         */
+        public void setOverwriteExistingToken(Boolean overwriteExistingToken) {
+            this.overwriteExistingToken = overwriteExistingToken;
         }
 
         /**

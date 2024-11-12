@@ -51,4 +51,7 @@ public interface ClientCredentialsConfiguration extends Toggleable, OutgoingRequ
 
     @NonNull
     Map<String, String> getAdditionalRequestParams();
+
+    @NonNull
+    Boolean shouldOverwriteExistingToken();
 }
