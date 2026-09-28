@@ -70,6 +70,7 @@ authenticationStrategies:
       jwks:
         title: Remote JWKS
         jwksCache: JWKS Caching
+        jwksFetchFailures: JWKS Fetch Failures
         staticJwks: Local JWKS
     jsonWebTokenValidator: JWT Validation
     jwtGenerator:

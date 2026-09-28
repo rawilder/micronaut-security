@@ -20,6 +20,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.Named;
 
+import java.time.Duration;
+
 /**
  * JSON Web Key Set Configuration.
  *
@@ -49,4 +51,42 @@ public interface JwksSignatureConfiguration extends Named {
     @NonNull
     @Deprecated(forRemoval = true, since = "4.11.0")
     Integer getCacheExpiration();
+
+    /**
+     * Number of additional attempts to fetch the JSON Web Key Set when an attempt fails or returns an unparseable response.
+     * @return The number of retries after the initial attempt. {@code 0} disables retries.
+     * @since 5.5.0
+     */
+    default int getRetryAttempts() {
+        return 0;
+    }
+
+    /**
+     * Delay between attempts to fetch the JSON Web Key Set.
+     * @return The delay between attempts.
+     * @since 5.5.0
+     */
+    @NonNull
+    default Duration getRetryDelay() {
+        return Duration.ZERO;
+    }
+
+    /**
+     * Whether to serve the last successfully fetched JSON Web Key Set when every attempt to fetch it fails.
+     * @return {@code true} to serve the last successfully fetched JSON Web Key Set when fetching fails.
+     * @since 5.5.0
+     */
+    default boolean isServeStaleOnFailure() {
+        return false;
+    }
+
+    /**
+     * Maximum age of a last successfully fetched JSON Web Key Set that may be served when fetching fails.
+     * @return The maximum age, or {@code null} for no limit.
+     * @since 5.5.0
+     */
+    @Nullable
+    default Duration getStaleMaxAge() {
+        return null;
+    }
 }

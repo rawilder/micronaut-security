@@ -20,6 +20,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.optim.StaticOptimizations;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -27,9 +28,12 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
 import java.text.ParseException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -44,9 +48,27 @@ public class DefaultJwkSetFetcher implements JwkSetFetcher<JWKSet> {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultJwkSetFetcher.class);
 
     private final JwksClient jwksClient;
+    private final Map<String, JwksSignatureConfiguration> jwksSignatureConfigurations;
+    private final Map<String, FetchedJwkSet> lastFetchedJwkSets = new ConcurrentHashMap<>();
 
+    /**
+     * @param jwksClient JSON Web Key Set client
+     * @deprecated Use {@link #DefaultJwkSetFetcher(JwksClient, Map)} instead. Retries and serving stale JSON Web Key Sets are not supported with this constructor.
+     */
+    @Deprecated(forRemoval = true, since = "5.5.0")
     public DefaultJwkSetFetcher(JwksClient jwksClient) {
+        this(jwksClient, Collections.emptyMap());
+    }
+
+    /**
+     * @param jwksClient JSON Web Key Set client
+     * @param jwksSignatureConfigurations JSON Web Key Set configurations keyed by name
+     * @since 5.5.0
+     */
+    @Inject
+    public DefaultJwkSetFetcher(JwksClient jwksClient, Map<String, JwksSignatureConfiguration> jwksSignatureConfigurations) {
         this.jwksClient = jwksClient;
+        this.jwksSignatureConfigurations = jwksSignatureConfigurations;
     }
 
     @Override
@@ -67,9 +89,54 @@ public class DefaultJwkSetFetcher implements JwkSetFetcher<JWKSet> {
         OPTIMIZATIONS.clear(url);
     }
 
-    @Nullable
     @SingleResult
     private Publisher<JWKSet> load(@Nullable String providerName, @NonNull String url) {
+        JwksSignatureConfiguration configuration = providerName != null ? jwksSignatureConfigurations.get(providerName) : null;
+        if (configuration == null) {
+            return loadOnce(providerName, url);
+        }
+        Mono<JWKSet> jwkSet = loadWithRetries(providerName, url, configuration.getRetryAttempts(), configuration.getRetryDelay());
+        if (!configuration.isServeStaleOnFailure()) {
+            return jwkSet;
+        }
+        return jwkSet
+            .doOnNext(fetched -> lastFetchedJwkSets.put(url, new FetchedJwkSet(fetched, Instant.now())))
+            .switchIfEmpty(Mono.defer(() -> lastFetchedJwkSet(url, configuration.getStaleMaxAge())));
+    }
+
+    private Mono<JWKSet> loadWithRetries(@Nullable String providerName, @NonNull String url, int retriesRemaining, @NonNull Duration retryDelay) {
+        Mono<JWKSet> attempt = loadOnce(providerName, url);
+        if (retriesRemaining <= 0) {
+            return attempt;
+        }
+        return attempt.switchIfEmpty(Mono.defer(() -> {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Retrying JWK Set fetch from {} ({} retries remaining)", url, retriesRemaining);
+            }
+            Mono<JWKSet> retry = loadWithRetries(providerName, url, retriesRemaining - 1, retryDelay);
+            return retryDelay.isZero() ? retry : Mono.delay(retryDelay).then(retry);
+        }));
+    }
+
+    private Mono<JWKSet> lastFetchedJwkSet(@NonNull String url, @Nullable Duration staleMaxAge) {
+        FetchedJwkSet lastFetched = lastFetchedJwkSets.get(url);
+        if (lastFetched == null) {
+            return Mono.empty();
+        }
+        Duration age = Duration.between(lastFetched.fetchedAt(), Instant.now());
+        if (staleMaxAge != null && age.compareTo(staleMaxAge) > 0) {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Fetching JWK Set from {} failed and the last successfully fetched JWK Set is older than the maximum stale age {}", url, staleMaxAge);
+            }
+            return Mono.empty();
+        }
+        if (LOG.isWarnEnabled()) {
+            LOG.warn("Fetching JWK Set from {} failed, serving the JWK Set successfully fetched {} ago", url, age);
+        }
+        return Mono.just(lastFetched.jwkSet());
+    }
+
+    private Mono<JWKSet> loadOnce(@Nullable String providerName, @NonNull String url) {
         return Mono.from(jwksClient.load(providerName, url))
                 .mapNotNull(jwkSetContent -> {
                     try {
@@ -81,6 +148,9 @@ public class DefaultJwkSetFetcher implements JwkSetFetcher<JWKSet> {
                     }
                     return null;
                 });
+    }
+
+    private record FetchedJwkSet(@NonNull JWKSet jwkSet, @NonNull Instant fetchedAt) {
     }
 
     /**

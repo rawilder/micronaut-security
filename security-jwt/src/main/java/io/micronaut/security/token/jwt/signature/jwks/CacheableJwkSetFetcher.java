@@ -24,6 +24,8 @@ import io.micronaut.core.annotation.Internal;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 
+import java.util.Map;
+
 /**
  * A {@link JwkSetFetcher} that caches the JWKSet using Micronaut Cache with cache named {@value #CACHE_JWKS}.
  *
@@ -39,8 +41,8 @@ import org.reactivestreams.Publisher;
 class CacheableJwkSetFetcher extends DefaultJwkSetFetcher {
     public static final String CACHE_JWKS = "jwks";
 
-    CacheableJwkSetFetcher(JwksClient jwksClient) {
-        super(jwksClient);
+    CacheableJwkSetFetcher(JwksClient jwksClient, Map<String, JwksSignatureConfiguration> jwksSignatureConfigurations) {
+        super(jwksClient, jwksSignatureConfigurations);
     }
 
     @Override

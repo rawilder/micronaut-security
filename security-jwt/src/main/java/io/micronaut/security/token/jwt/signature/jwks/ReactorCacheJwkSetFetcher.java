@@ -48,7 +48,7 @@ final class ReactorCacheJwkSetFetcher extends DefaultJwkSetFetcher {
     private final Map<String, JwksSignatureConfiguration> jwksSignatureConfigurations;
 
     ReactorCacheJwkSetFetcher(JwksClient jwksClient, Map<String, JwksSignatureConfiguration> jwksSignatureConfigurations) {
-        super(jwksClient);
+        super(jwksClient, jwksSignatureConfigurations);
         this.jwksSignatureConfigurations = jwksSignatureConfigurations;
     }
 
