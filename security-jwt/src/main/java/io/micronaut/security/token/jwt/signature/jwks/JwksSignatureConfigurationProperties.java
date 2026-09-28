@@ -23,6 +23,9 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+
+import java.time.Duration;
 
 /**
  * JSON Web Key Set (JWKS) Signature Configuration properties holder.
@@ -47,6 +50,18 @@ public class JwksSignatureConfigurationProperties implements JwksSignatureConfig
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_CACHE_EXPIRATION = 60;
 
+    /**
+     * The default number of retries when fetching the JSON Web Key Set.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_RETRY_ATTEMPTS = 0;
+
+    /**
+     * The default value for serving the last successfully fetched JSON Web Key Set when fetching fails.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_SERVE_STALE_ON_FAILURE = false;
+
     @Nullable
     private final String name;
 
@@ -56,6 +71,16 @@ public class JwksSignatureConfigurationProperties implements JwksSignatureConfig
     private String url;
 
     private KeyType keyType = DEFAULT_KEYTYPE;
+
+    private int retryAttempts = DEFAULT_RETRY_ATTEMPTS;
+
+    @NonNull
+    private Duration retryDelay = Duration.ZERO;
+
+    private boolean serveStaleOnFailure = DEFAULT_SERVE_STALE_ON_FAILURE;
+
+    @Nullable
+    private Duration staleMaxAge;
     
     public JwksSignatureConfigurationProperties(@Parameter String name) {
         this.name = name;
@@ -124,5 +149,61 @@ public class JwksSignatureConfigurationProperties implements JwksSignatureConfig
      */
     public void setKeyType(KeyType keyType) {
         this.keyType = keyType;
+    }
+
+    @Override
+    @PositiveOrZero
+    public int getRetryAttempts() {
+        return retryAttempts;
+    }
+
+    /**
+     * Number of additional attempts to fetch the JSON Web Key Set when an attempt fails or returns an unparseable response. Retries happen while the request that triggered the fetch waits. Default value {@value #DEFAULT_RETRY_ATTEMPTS} (no retries).
+     * @param retryAttempts The number of retries after the initial attempt.
+     */
+    public void setRetryAttempts(int retryAttempts) {
+        this.retryAttempts = retryAttempts;
+    }
+
+    @Override
+    @NonNull
+    public Duration getRetryDelay() {
+        return retryDelay;
+    }
+
+    /**
+     * Delay between attempts to fetch the JSON Web Key Set. Default value 0 (retry immediately).
+     * @param retryDelay The delay between attempts.
+     */
+    public void setRetryDelay(@NonNull Duration retryDelay) {
+        ArgumentUtils.requireNonNull("retryDelay", retryDelay);
+        this.retryDelay = retryDelay;
+    }
+
+    @Override
+    public boolean isServeStaleOnFailure() {
+        return serveStaleOnFailure;
+    }
+
+    /**
+     * Whether to serve the last successfully fetched JSON Web Key Set when every attempt to fetch it fails. Keys removed from the remote JSON Web Key Set continue to be trusted until a fetch succeeds. Default value {@value #DEFAULT_SERVE_STALE_ON_FAILURE}.
+     * @param serveStaleOnFailure {@code true} to serve the last successfully fetched JSON Web Key Set when fetching fails.
+     */
+    public void setServeStaleOnFailure(boolean serveStaleOnFailure) {
+        this.serveStaleOnFailure = serveStaleOnFailure;
+    }
+
+    @Override
+    @Nullable
+    public Duration getStaleMaxAge() {
+        return staleMaxAge;
+    }
+
+    /**
+     * Maximum age of the last successfully fetched JSON Web Key Set that may be served when fetching fails. Only applies when serve-stale-on-failure is enabled. Default value none (no limit).
+     * @param staleMaxAge The maximum age.
+     */
+    public void setStaleMaxAge(@Nullable Duration staleMaxAge) {
+        this.staleMaxAge = staleMaxAge;
     }
 }

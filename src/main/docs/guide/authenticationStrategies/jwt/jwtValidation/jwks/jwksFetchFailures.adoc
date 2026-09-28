@@ -1,0 +1,47 @@
+When a remote JSON Web Key Set (JWKS) must be fetched, for example because its cache entry expired, the request that needs it waits for the fetch. By default, if the fetch fails (a connection error, a timeout, an error response, or an unparseable body), no keys are available to verify the token, and requests waiting for that fetch are rejected even when their tokens are valid. The next request triggers a new fetch.
+
+You can configure each remote JWKS to retry failed fetches, and to fall back to the last successfully fetched JWKS when every attempt fails:
+
+[configuration]
+----
+micronaut:
+  security:
+    token:
+      jwt:
+        signatures:
+          jwks:
+            okta:
+              url: 'https://example.okta.com/oauth2/default/v1/keys'
+              retry-attempts: 2
+              retry-delay: 200ms
+              serve-stale-on-failure: true
+              stale-max-age: 24h
+----
+
+|===
+|Property |Default |Description
+
+|`retry-attempts`
+|`0`
+|Number of additional attempts after the initial fetch fails.
+
+|`retry-delay`
+|`0s`
+|Delay between attempts.
+
+|`serve-stale-on-failure`
+|`false`
+|Serve the last successfully fetched JWKS when every attempt fails.
+
+|`stale-max-age`
+|none
+|Maximum age of the last successfully fetched JWKS that may be served. No limit when not set.
+|===
+
+Retries happen while requests wait for the fetch, so each retry, plus its delay, adds to the latency of those requests. With a long HTTP client read timeout, prefer a short retry delay and few attempts, or configure a dedicated HTTP client for the JWKS provider with a shorter timeout as described in <<jwks, Remote JWKS>>.
+
+When a stale JWKS is served, it is cached like a successfully fetched one, so the next fetch attempt happens once that cache entry expires. The effective maximum staleness is therefore `stale-max-age` plus the cache expiration.
+
+WARNING: While fetches fail and a stale JWKS is served, keys that the provider removed from its JWKS, for example after revoking a compromised key, continue to be trusted. Use `stale-max-age` to bound how long that can last.
+
+A stale JWKS can only be served after at least one successful fetch since the application started.
